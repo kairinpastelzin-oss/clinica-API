@@ -1,13 +1,13 @@
 import express from 'express';
 import pkg from 'pg';
-const { Poo1 } = pkg;
+const { Pool } = pkg;
 
 //const express = require('express');
 //const sqlite3 = require('sqlite3').verbose();
 
-const poo1 = new Poo1({
+const poo1 = new Pool({
     user: 'postgres',
-    host: 'locahost',
+    host: 'localhost',
     database: 'clinica',
     password: '123',
     port: 5432
@@ -27,7 +27,8 @@ app.use(express.static('public'));
 
 const port = 3000;
 
-/*const db = new sqlite3.Database('./clinica.db', (err) => {
+/*
+const db = new sqlite3.Database('./clinica.db', (err) => {
     if (err) {
         console.error("Erro ao abrir o Banco de Dados:", err.message);
     } else {
@@ -70,6 +71,28 @@ db.serialize(() => {
 });
 */
 
+await poo1.query(`
+    CREATE TABLE IF NOT EXISTS atendentes(
+        id SERIAL PRIMARY KEY, 
+        nome VARCHAR(100) NOT NULL,
+        turno VARCHAR(50) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS clientes(
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(100) NOT NULL,
+        cpf VARCHAR(20) UNIQUE NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS atendimentos(
+        id SERIAL PRIMARY KEY,
+        data VARCHAR(50) NOT NULL,
+        descricao TEXT,
+        cliente_id INTEGER REFERENCES clientes(id),
+        atendente_id INTEGER REFERENCES atendentes(id)
+    );
+`);
+
 app.get('/', (req, res) => {
    res.send('A API da clínica está online.');
 });
@@ -78,15 +101,14 @@ app.get('/', (req, res) => {
 app.get('/sobre', (req, res) => {
     res.send('Desenvolvido por Kairo Carvalho.');
 });
-
-
+/*
 app.post('/clientes', (req, res) => {
 
     const nome = req.body.nome;
     const cpf = req.body.cpf;
 
     const sql = `
-        INSERT INTO clientes (nome, cpf)
+        INSERT INTO clientes (nome, cpf) 
         VALUES (?, ?)
     `;
 
@@ -106,7 +128,35 @@ app.post('/clientes', (req, res) => {
         });
     });
 });
+*/
+app.get('/clientes', async (req, res) =>{
+    const sql = 'SELECT * FROM clientes';
 
+    try{
+        const resultado = await poo1.query(sql);
+        res.json(resultado.rows);
+    }catch(err){
+        res.status(500).json({ erro: err.message });
+    }
+});
+
+app.post('/clientes', async (req,res) =>{
+    const{nome,cpf} = req.body;
+    const sql = 'INSERT INTO clientes (nome, cpf) VALUES ($1, $2) RETURNING id';
+
+    try{
+        const resultado = await poo1.query(sql, [nome, cpf]);
+        res.status(201).json({
+            mensagem: 'Cliente cadastrado com sucesso',
+            id: resultado.rows[0].id,
+            nome,
+            cpf
+        });
+    }catch(err){
+        res.status(400).json({ erro: err.message })
+    }
+});
+/*
 app.get('/clientes', (req, res) => {
     const sql = `SELECT * FROM clientes`;
 
@@ -148,7 +198,7 @@ app.get('/clientes', (req, res) => {
                             ${colunas.map(coluna => `<th>${coluna}</th>`).join('')}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody>'
         `;
 
         
@@ -171,8 +221,7 @@ app.get('/clientes', (req, res) => {
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
     });
-});
-
+});    
 app.post('/atendentes', (req, res) => {
 
     const nome = req.body.nome;
@@ -251,7 +300,7 @@ app.get('/atendimentos', (req, res) =>{
         res.json(rows)
     });
 });
-
+*/
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`);
 });
